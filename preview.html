@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Michael Smith — Portfolio (Preview)</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React + Babel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+
+    <!-- GSAP + ScrollTrigger + hls.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js"></script>
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              bg: "hsl(0 0% 4%)",
+              surface: "hsl(0 0% 8%)",
+              "text-primary": "hsl(0 0% 96%)",
+              muted: "hsl(0 0% 53%)",
+              stroke: "hsl(0 0% 12%)",
+            },
+            fontFamily: {
+              body: ["Inter", "sans-serif"],
+              display: ["Instrument Serif", "serif"],
+            },
+            animation: {
+              "scroll-down": "scroll-down 1.5s ease-in-out infinite",
+              "role-fade-in": "role-fade-in 0.4s ease-out",
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * { border-color: hsl(0 0% 12%); }
+      html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+      body { background: hsl(0 0% 4%); color: hsl(0 0% 96%); font-family: "Inter", sans-serif; overflow-x: hidden; }
+      ::selection { background: rgba(137,170,204,0.3); }
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: hsl(0 0% 4%); }
+      ::-webkit-scrollbar-thumb { background: hsl(0 0% 12%); border-radius: 9999px; }
+
+      .accent-gradient { background: linear-gradient(90deg,#89AACC 0%,#4E85BF 100%); }
+      .accent-gradient-animated {
+        background: linear-gradient(90deg,#89AACC 0%,#4E85BF 50%,#89AACC 100%);
+        background-size: 200% 200%;
+        animation: gradient-shift 6s ease infinite;
+      }
+
+      @keyframes scroll-down { 0%{transform:translateY(-100%)} 100%{transform:translateY(200%)} }
+      @keyframes role-fade-in { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:translateY(0)} }
+      @keyframes gradient-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+      @keyframes word-in { 0%{opacity:0;transform:translateY(20px)} 100%{opacity:1;transform:translateY(0)} }
+      .animate-scroll-down { animation: scroll-down 1.5s ease-in-out infinite; }
+      .animate-role-fade-in { animation: role-fade-in 0.4s ease-out; }
+      .word-in { animation: word-in .4s ease-out; }
+      .reveal { opacity: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!-- Graceful fallback: if any remote image fails to load, swap in a placeholder -->
+    <script>
+      document.addEventListener("error", function (e) {
+        var t = e.target;
+        if (t && t.tagName === "IMG" && !t.dataset.fallback) {
+          t.dataset.fallback = "1";
+          t.src = "https://picsum.photos/seed/" + (t.alt || Math.random().toString(36).slice(2)) + "/800/800";
+        }
+      }, true);
+    </script>
+
+    <script type="text/babel" data-presets="react">
+      const { useState, useEffect, useRef } = React;
+      gsap.registerPlugin(ScrollTrigger);
+
+      const HLS_SRC = "https://stream.mux.com/Aa02T7oM1wH5Mk5EEVDYhbZ1ChcdhRsS2m1NYyx4Ua1g.m3u8";
+
+      function useHls(flip) {
+        const ref = useRef(null);
+        useEffect(() => {
+          const v = ref.current;
+          if (!v) return;
+          let hls;
+          if (window.Hls && Hls.isSupported()) {
+            hls = new Hls();
+            hls.loadSource(HLS_SRC);
+            hls.attachMedia(v);
+          } else if (v.canPlayType("application/vnd.apple.mpegurl")) {
+            v.src = HLS_SRC;
+          }
+          return () => hls && hls.destroy();
+        }, []);
+        return ref;
+      }
+
+      /* ---------- Loading ---------- */
+      const WORDS = ["Design", "Create", "Inspire"];
+      function LoadingScreen({ onDone }) {
+        const [count, setCount] = useState(0);
+        const [wi, setWi] = useState(0);
+        const [gone, setGone] = useState(false);
+        useEffect(() => {
+          const start = performance.now();
+          let raf;
+          const tick = (now) => {
+            const p = Math.min((now - start) / 2700, 1);
+            setCount(Math.round(p * 100));
+            if (p < 1) raf = requestAnimationFrame(tick);
+          };
+          raf = requestAnimationFrame(tick);
+          return () => cancelAnimationFrame(raf);
+        }, []);
+        useEffect(() => {
+          const id = setInterval(() => setWi((i) => (i + 1) % WORDS.length), 900);
+          return () => clearInterval(id);
+        }, []);
+        useEffect(() => {
+          if (count >= 100) {
+            const id = setTimeout(() => { setGone(true); setTimeout(onDone, 600); }, 400);
+            return () => clearTimeout(id);
+          }
+        }, [count]);
+        return (
+          <div className={"fixed inset-0 z-[9999] bg-bg overflow-hidden transition-opacity duration-600 " + (gone ? "opacity-0" : "opacity-100")}>
+            <div className="absolute top-6 left-6 md:top-10 md:left-10">
+              <span className="text-xs text-muted uppercase tracking-[0.3em]">Portfolio</span>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <h2 key={wi} className="word-in text-4xl md:text-6xl lg:text-7xl font-display italic text-text-primary/80">{WORDS[wi]}</h2>
+            </div>
+            <div className="absolute bottom-8 right-6 md:bottom-12 md:right-10">
+              <span className="text-6xl md:text-8xl lg:text-9xl font-display text-text-primary tabular-nums">{String(count).padStart(3, "0")}</span>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-stroke/50">
+              <div className="accent-gradient h-full origin-left" style={{ transform: `scaleX(${count / 100})`, boxShadow: "0 0 8px rgba(137,170,204,0.35)" }} />
+            </div>
+          </div>
+        );
+      }
+
+      /* ---------- Navbar ---------- */
+      const NAV = [ ["Home","#home"], ["Work","#work"], ["Resume","#contact"] ];
+      function Navbar() {
+        const [scrolled, setScrolled] = useState(false);
+        const [active, setActive] = useState("Home");
+        useEffect(() => {
+          const s = () => setScrolled(window.scrollY > 100);
+          window.addEventListener("scroll", s, { passive: true });
+          return () => window.removeEventListener("scroll", s);
+        }, []);
+        const go = (e, href, label) => { e.preventDefault(); setActive(label); document.querySelector(href)?.scrollIntoView({behavior:"smooth"}); };
+        return (
+          <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4 md:pt-6 px-4">
+            <nav className={"inline-flex items-center rounded-full backdrop-blur-md border border-white/10 bg-surface px-2 py-2 transition-shadow duration-300 " + (scrolled ? "shadow-md shadow-black/10" : "")}>
+              <a href="#home" onClick={(e)=>go(e,"#home","Home")} className="group relative flex h-9 w-9 items-center justify-center rounded-full transition-transform duration-300 hover:scale-110">
+                <span className="accent-gradient absolute inset-0 rounded-full transition-transform duration-500 group-hover:-rotate-180" />
+                <span className="absolute inset-[2px] rounded-full bg-bg" />
+                <span className="relative z-10 font-display italic text-[13px] text-text-primary">JA</span>
+              </a>
+              <span className="mx-1 hidden h-5 w-px bg-stroke sm:block" />
+              <div className="flex items-center">
+                {NAV.map(([label, href]) => (
+                  <a key={label} href={href} onClick={(e)=>go(e,href,label)} className={"rounded-full px-3 py-1.5 text-xs transition-colors duration-200 sm:px-4 sm:py-2 sm:text-sm " + (active===label ? "bg-stroke/50 text-text-primary" : "text-muted hover:bg-stroke/50 hover:text-text-primary")}>{label}</a>
+                ))}
+              </div>
+              <span className="mx-1 hidden h-5 w-px bg-stroke sm:block" />
+              <a href="#contact" onClick={(e)=>go(e,"#contact","Resume")} className="group relative rounded-full">
+                <span className="accent-gradient-animated absolute rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{inset:"-2px"}} />
+                <span className="relative inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1.5 text-xs text-text-primary backdrop-blur-md sm:px-4 sm:py-2 sm:text-sm">Say hi <span className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">↗</span></span>
+              </a>
+            </nav>
+          </div>
+        );
+      }
+
+      /* ---------- Hero ---------- */
+      const ROLES = ["Creative","Fullstack","Founder","Scholar"];
+      function Hero() {
+        const videoRef = useHls();
+        const rootRef = useRef(null);
+        const [ri, setRi] = useState(0);
+        useEffect(() => { const id = setInterval(()=>setRi(i=>(i+1)%ROLES.length),2000); return ()=>clearInterval(id); }, []);
+        useEffect(() => {
+          const ctx = gsap.context(() => {
+            const tl = gsap.timeline({ defaults:{ ease:"power3.out" } });
+            tl.from(".name-reveal",{opacity:0,y:50,duration:1.2,delay:0.1})
+              .from(".blur-in",{opacity:0,filter:"blur(10px)",y:20,duration:1,stagger:0.1},0.3);
+          }, rootRef);
+          return () => ctx.revert();
+        }, []);
+        const scrollTo = (id) => (e) => { e.preventDefault(); document.querySelector(id)?.scrollIntoView({behavior:"smooth"}); };
+        return (
+          <div ref={rootRef} className="relative flex min-h-screen w-full items-center justify-center overflow-hidden">
+            <video ref={videoRef} autoPlay muted loop playsInline className="absolute left-1/2 top-1/2 min-h-full min-w-full -translate-x-1/2 -translate-y-1/2 object-cover" />
+            <div className="absolute inset-0 bg-black/20" />
+            <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-bg to-transparent" />
+            <div className="relative z-10 flex flex-col items-center px-6 text-center">
+              <span className="blur-in mb-8 text-xs uppercase tracking-[0.3em] text-muted">Collection '26</span>
+              <h1 className="name-reveal mb-6 font-display text-6xl italic leading-[0.9] tracking-tight text-text-primary md:text-8xl lg:text-9xl">Michael Smith</h1>
+              <p className="blur-in mb-6 text-lg text-text-primary/90 md:text-xl">A <span key={ri} className="inline-block animate-role-fade-in font-display italic text-text-primary">{ROLES[ri]}</span> lives in Chicago.</p>
+              <p className="blur-in mb-12 max-w-md text-sm text-muted md:text-base">Designing seamless digital interactions by focusing on the unique nuances which bring systems to life.</p>
+              <div className="blur-in inline-flex gap-4">
+                <a href="#work" onClick={scrollTo("#work")} className="group relative rounded-full text-sm transition-transform duration-300 hover:scale-105">
+                  <span className="accent-gradient-animated absolute rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{inset:"-2px"}} />
+                  <span className="relative block rounded-full bg-text-primary px-7 py-3.5 text-bg transition-colors duration-300 group-hover:bg-bg group-hover:text-text-primary">See Works</span>
+                </a>
+                <a href="#contact" onClick={scrollTo("#contact")} className="group relative rounded-full text-sm transition-transform duration-300 hover:scale-105">
+                  <span className="accent-gradient-animated absolute rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{inset:"-2px"}} />
+                  <span className="relative block rounded-full border-2 border-stroke bg-bg px-7 py-3.5 text-text-primary transition-colors duration-300 group-hover:border-transparent">Reach out...</span>
+                </a>
+              </div>
+            </div>
+            <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-3">
+              <span className="text-xs uppercase tracking-[0.2em] text-muted">Scroll</span>
+              <div className="relative h-10 w-px overflow-hidden bg-stroke"><div className="accent-gradient absolute left-0 h-4 w-full animate-scroll-down" /></div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ---------- Section header ---------- */
+      function Header({ eyebrow, lead, italic, sub, cta }) {
+        return (
+          <div className="reveal mb-10 flex flex-col gap-5 md:mb-14 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="mb-4 flex items-center gap-3"><span className="h-px w-8 bg-stroke" /><span className="text-xs uppercase tracking-[0.3em] text-muted">{eyebrow}</span></div>
+              <h2 className="text-4xl leading-tight tracking-tight text-text-primary md:text-5xl lg:text-6xl">{lead} <span className="font-display italic">{italic}</span></h2>
+              <p className="mt-4 max-w-md text-sm text-muted md:text-base">{sub}</p>
+            </div>
+            {cta && (
+              <a href="#work" className="group relative hidden self-start rounded-full text-sm md:inline-flex">
+                <span className="accent-gradient-animated absolute rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{inset:"-2px"}} />
+                <span className="relative inline-flex items-center gap-2 rounded-full border border-stroke bg-bg px-6 py-3 text-text-primary transition-colors duration-300 group-hover:border-transparent">{cta} <span className="transition-transform duration-200 group-hover:translate-x-0.5">→</span></span>
+              </a>
+            )}
+          </div>
+        );
+      }
+
+      /* ---------- Selected Works ---------- */
+      const PROJECTS = [
+        ["Automotive Motion","https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80","md:col-span-7"],
+        ["Urban Architecture","https://images.unsplash.com/photo-1487958449943-2429e8be8625?auto=format&fit=crop&w=1000&q=80","md:col-span-5"],
+        ["Human Perspective","https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=1000&q=80","md:col-span-5"],
+        ["Brand Identity","https://images.unsplash.com/photo-1558655146-9f40138edfeb?auto=format&fit=crop&w=1200&q=80","md:col-span-7"],
+      ];
+      function SelectedWorks() {
+        return (
+          <div id="work" className="bg-bg py-12 md:py-16">
+            <div className="mx-auto max-w-[1200px] px-6 md:px-10 lg:px-16">
+              <Header eyebrow="Selected Work" lead="Featured" italic="projects" sub="A selection of projects I've worked on, from concept to launch." cta="View all work" />
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-12 md:gap-6">
+                {PROJECTS.map(([title, img, span]) => (
+                  <article key={title} className={"reveal group relative overflow-hidden rounded-3xl border border-stroke bg-surface aspect-[4/3] md:aspect-[16/10] " + span}>
+                    <img src={img} alt={title} loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <div className="absolute inset-0 opacity-20 mix-blend-multiply" style={{backgroundImage:"radial-gradient(circle,#000 1px,transparent 1px)",backgroundSize:"4px 4px"}} />
+                    <div className="absolute inset-0 flex items-center justify-center bg-bg/70 opacity-0 backdrop-blur-lg transition-opacity duration-500 group-hover:opacity-100">
+                      <div className="relative rounded-full">
+                        <span className="accent-gradient-animated absolute rounded-full" style={{inset:"-2px"}} />
+                        <span className="relative inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm text-black">View — <span className="font-display italic">{title}</span></span>
+                      </div>
+                    </div>
+                    <div className="absolute bottom-5 left-5 z-10"><p className="text-sm text-white/90 drop-shadow">{title}</p></div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ---------- Journal ---------- */
+      const ENTRIES = [
+        ["On designing with restraint","https://images.unsplash.com/photo-1618172193763-c511deb635ca?auto=format&fit=crop&w=400&q=80","5 min read","Jun 2026"],
+        ["The quiet power of motion","https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&q=80","7 min read","May 2026"],
+        ["Building systems that breathe","https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=400&q=80","4 min read","Apr 2026"],
+        ["Typography as a first principle","https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=400&q=80","6 min read","Mar 2026"],
+      ];
+      function Journal() {
+        return (
+          <div className="bg-bg py-16 md:py-24">
+            <div className="mx-auto max-w-[1200px] px-6 md:px-10 lg:px-16">
+              <Header eyebrow="Journal" lead="Recent" italic="thoughts" sub="Notes on design, engineering, and the craft in between." cta="View all" />
+              <div className="flex flex-col gap-4">
+                {ENTRIES.map(([title, img, rt, date]) => (
+                  <a key={title} href="#" onClick={(e)=>e.preventDefault()} className="reveal group flex items-center gap-6 rounded-[40px] border border-stroke bg-surface/30 p-4 transition-colors duration-300 hover:bg-surface sm:rounded-full">
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full sm:h-20 sm:w-20"><img src={img} alt={title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" /></div>
+                    <div className="flex flex-1 flex-col"><h3 className="text-lg text-text-primary md:text-xl">{title}</h3><span className="text-xs text-muted">{rt}</span></div>
+                    <div className="hidden shrink-0 items-center gap-6 pr-4 sm:flex"><span className="text-sm text-muted">{date}</span><span className="text-text-primary transition-transform duration-200 group-hover:translate-x-1">→</span></div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ---------- Explorations ---------- */
+      const IMGS = [
+        "https://images.unsplash.com/photo-1614851099175-e5b30eb6f696?auto=format&fit=crop&w=700&q=80",
+        "https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?auto=format&fit=crop&w=700&q=80",
+        "https://images.unsplash.com/photo-1620121692029-d088224ddc74?auto=format&fit=crop&w=700&q=80",
+        "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=700&q=80",
+        "https://images.unsplash.com/photo-1635776062127-d379bfcba9f8?auto=format&fit=crop&w=700&q=80",
+        "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&w=700&q=80",
+      ];
+      function Explorations() {
+        const sectionRef = useRef(null), contentRef = useRef(null), leftRef = useRef(null), rightRef = useRef(null);
+        const [lb, setLb] = useState(null);
+        useEffect(() => {
+          const section=sectionRef.current, content=contentRef.current, left=leftRef.current, right=rightRef.current;
+          if (!section||!content||!left||!right) return;
+          const ctx = gsap.context(() => {
+            ScrollTrigger.create({ trigger:section, start:"top top", end:"bottom bottom", pin:content, pinSpacing:false });
+            gsap.to(left,{ yPercent:-12, ease:"none", scrollTrigger:{trigger:section,start:"top bottom",end:"bottom top",scrub:1} });
+            gsap.to(right,{ yPercent:-28, ease:"none", scrollTrigger:{trigger:section,start:"top bottom",end:"bottom top",scrub:1} });
+          }, section);
+          return () => ctx.revert();
+        }, []);
+        const left = IMGS.filter((_,i)=>i%2===0), right = IMGS.filter((_,i)=>i%2===1);
+        return (
+          <section ref={sectionRef} className="relative min-h-[300vh] bg-bg">
+            <div ref={contentRef} className="pointer-events-none relative z-10 flex h-screen flex-col items-center justify-center px-6 text-center">
+              <div className="mb-4 flex items-center gap-3"><span className="h-px w-8 bg-stroke" /><span className="text-xs uppercase tracking-[0.3em] text-muted">Explorations</span><span className="h-px w-8 bg-stroke" /></div>
+              <h2 className="text-5xl leading-tight tracking-tight text-text-primary md:text-7xl lg:text-8xl">Visual <span className="font-display italic">playground</span></h2>
+              <p className="mt-5 max-w-md text-sm text-muted md:text-base">Experiments, side quests, and moments of visual curiosity.</p>
+              <a href="https://dribbble.com" target="_blank" rel="noreferrer" className="group pointer-events-auto relative mt-8 inline-flex rounded-full text-sm">
+                <span className="accent-gradient-animated absolute rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{inset:"-2px"}} />
+                <span className="relative inline-flex items-center gap-2 rounded-full border border-stroke bg-bg px-6 py-3 text-text-primary transition-colors duration-300 group-hover:border-transparent">View on Dribbble ↗</span>
+              </a>
+            </div>
+            <div className="absolute inset-0 z-20 flex justify-center px-6">
+              <div className="grid w-full max-w-[1400px] grid-cols-2 gap-12 md:gap-40">
+                <div ref={leftRef} className="flex flex-col items-end gap-16 pt-[40vh] md:gap-28">
+                  {left.map((src,i)=>(
+                    <button key={src} onClick={()=>setLb(src)} style={{transform:`rotate(${i%2===0?-3:2}deg)`}} className="aspect-square w-full max-w-[320px] overflow-hidden rounded-2xl border border-stroke bg-surface transition-transform duration-500 hover:!rotate-0 hover:scale-[1.03]"><img src={src} loading="lazy" className="h-full w-full object-cover" /></button>
+                  ))}
+                </div>
+                <div ref={rightRef} className="flex flex-col gap-16 pt-[65vh] md:gap-28">
+                  {right.map((src,i)=>(
+                    <button key={src} onClick={()=>setLb(src)} style={{transform:`rotate(${i%2===0?3:-2}deg)`}} className="aspect-square w-full max-w-[320px] overflow-hidden rounded-2xl border border-stroke bg-surface transition-transform duration-500 hover:!rotate-0 hover:scale-[1.03]"><img src={src} loading="lazy" className="h-full w-full object-cover" /></button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {lb && (
+              <div onClick={()=>setLb(null)} className="fixed inset-0 z-[9998] flex cursor-zoom-out items-center justify-center bg-black/80 p-6 backdrop-blur-sm"><img src={lb} className="max-h-[85vh] max-w-[85vw] rounded-2xl object-contain" /></div>
+            )}
+          </section>
+        );
+      }
+
+      /* ---------- Stats ---------- */
+      const STATS = [["20+","Years Experience"],["95+","Projects Done"],["200%","Satisfied Clients"]];
+      function Stats() {
+        return (
+          <div className="bg-bg py-16 md:py-24">
+            <div className="mx-auto max-w-[1200px] px-6 md:px-10 lg:px-16">
+              <div className="grid grid-cols-1 gap-10 sm:grid-cols-3 md:gap-6">
+                {STATS.map(([v,l])=>(
+                  <div key={l} className="reveal flex flex-col items-center text-center">
+                    <span className="font-display text-6xl italic text-text-primary md:text-7xl lg:text-8xl">{v}</span>
+                    <span className="mt-3 text-xs uppercase tracking-[0.3em] text-muted">{l}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ---------- Contact ---------- */
+      const SOCIALS = [["Twitter","https://twitter.com"],["LinkedIn","https://linkedin.com"],["Dribbble","https://dribbble.com"],["GitHub","https://github.com"]];
+      function Contact() {
+        const videoRef = useHls();
+        const marqueeRef = useRef(null);
+        useEffect(() => {
+          const el = marqueeRef.current; if (!el) return;
+          const ctx = gsap.context(() => { gsap.to(el,{ xPercent:-50, duration:40, ease:"none", repeat:-1 }); }, el);
+          return () => ctx.revert();
+        }, []);
+        return (
+          <footer id="contact" className="relative overflow-hidden bg-bg pb-8 pt-16 md:pb-12 md:pt-20">
+            <video ref={videoRef} autoPlay muted loop playsInline className="absolute left-1/2 top-1/2 min-h-full min-w-full -translate-x-1/2 -translate-y-1/2 scale-y-[-1] object-cover" />
+            <div className="absolute inset-0 bg-black/60" />
+            <div className="absolute inset-0 bg-gradient-to-b from-bg via-transparent to-bg" />
+            <div className="relative z-10 mb-16 overflow-hidden md:mb-24">
+              <div ref={marqueeRef} className="flex whitespace-nowrap">
+                {Array.from({length:10}).map((_,i)=>(<span key={i} className="font-display text-5xl italic text-text-primary/90 md:text-7xl lg:text-8xl">Building the Future •&nbsp;</span>))}
+              </div>
+            </div>
+            <div className="relative z-10 mx-auto flex max-w-[1200px] flex-col items-center px-6 text-center">
+              <span className="mb-6 text-xs uppercase tracking-[0.3em] text-muted">Let's work together</span>
+              <a href="mailto:dxruxx@gmail.com" className="group relative rounded-full text-base md:text-lg">
+                <span className="accent-gradient-animated absolute rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{inset:"-2px"}} />
+                <span className="relative block rounded-full bg-text-primary px-8 py-4 text-bg transition-colors duration-300 group-hover:bg-bg group-hover:text-text-primary">dxruxx@gmail.com ↗</span>
+              </a>
+            </div>
+            <div className="relative z-10 mx-auto mt-20 flex max-w-[1200px] flex-col items-center gap-6 px-6 md:mt-28 md:flex-row md:justify-between">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" /></span>
+                <span className="text-sm text-muted">Available for projects</span>
+              </div>
+              <div className="flex items-center gap-6">
+                {SOCIALS.map(([l,h])=>(<a key={l} href={h} target="_blank" rel="noreferrer" className="text-sm text-muted transition-colors duration-200 hover:text-text-primary">{l}</a>))}
+              </div>
+              <span className="text-xs text-muted">© 2026 Michael Smith</span>
+            </div>
+          </footer>
+        );
+      }
+
+      /* ---------- App ---------- */
+      function App() {
+        const [loading, setLoading] = useState(true);
+        useEffect(() => {
+          if (loading) return;
+          const t = setTimeout(() => {
+            gsap.utils.toArray(".reveal").forEach((el) => {
+              gsap.fromTo(el, { opacity:0, y:30 }, { opacity:1, y:0, duration:0.9, ease:"power2.out", scrollTrigger:{ trigger:el, start:"top 85%" } });
+            });
+            ScrollTrigger.refresh();
+          }, 100);
+          return () => clearTimeout(t);
+        }, [loading]);
+        return (
+          <div className="relative min-h-screen bg-bg text-text-primary">
+            {loading && <LoadingScreen onDone={() => setLoading(false)} />}
+            <Navbar />
+            <main>
+              <div id="home"><Hero /></div>
+              <SelectedWorks />
+              <Journal />
+              <Explorations />
+              <Stats />
+              <Contact />
+            </main>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
