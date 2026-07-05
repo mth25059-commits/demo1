@@ -6,7 +6,7 @@
   "description": "Dark portfolio landing page — React + Vite + Tailwind + GSAP + Framer Motion + hls.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
